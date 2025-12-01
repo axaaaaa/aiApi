@@ -7,136 +7,226 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        /* 简单的打字机光标动画 */
-        .cursor::after { content: '▋'; animation: blink 1s step-start infinite; }
+        /* 光标闪烁动画 */
+        .cursor::after { content: '▋'; animation: blink 1s step-start infinite; color: #2563eb; }
         @keyframes blink { 50% { opacity: 0; } }
-        /* Markdown 样式微调 */
-        .prose pre { background: #1f2937; color: #e5e7eb; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
-        .prose code { color: #ef4444; background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; }
-        .prose pre code { color: inherit; background: transparent; padding: 0; }
+        
+        /* Markdown 内容样式优化 */
+        .prose { font-size: 0.95rem; line-height: 1.6; }
+        .prose pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.5rem 0; border: 1px solid #334155; }
+        .prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }
+        .prose :not(pre) > code { color: #ef4444; background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; }
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .prose p { margin-bottom: 0.5rem; }
+        .prose h1, .prose h2, .prose h3 { font-weight: bold; color: #1f2937; margin-top: 1rem; margin-bottom: 0.5rem; }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col">
+<body class="bg-gray-50 h-screen flex flex-col font-sans">
 
-    <header class="bg-white border-b p-4 shadow-sm z-10">
+    <header class="bg-white border-b px-4 py-3 shadow-sm z-20">
         <div class="max-w-4xl mx-auto flex flex-wrap gap-2 items-center justify-between">
-            <h1 class="text-xl font-bold text-gray-800">🤖 通用 AI 调用台</h1>
-            <button onclick="toggleSettings()" class="text-sm text-blue-600 hover:underline">⚙️ 设置 API & 模型</button>
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🤖</span>
+                <h1 class="text-lg font-bold text-gray-800 tracking-tight">通用 AI 调用台</h1>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="exportChat()" title="导出为 Markdown 文件" class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-200 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    <span>导出记录</span>
+                </button>
+                <button onclick="toggleSettings()" class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md border border-transparent transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.425-.144-2.181-.233-1.07-.126-2.072-.256-2.906-.35M10.34 15.84q.366 1.802.732 3.604c.264 1.302.482 2.37.663 3.242M10.34 15.84l-5.323 2.95m5.323-2.95L3.84 21.37M20.16 8.16q-.366-1.802-.732-3.604c-.264-1.302-.482-2.37-.663-3.242M20.16 8.16c.688.06 1.425.144 2.181.233 1.07.126 2.072.256 2.906.35M20.16 8.16l5.323-2.95m-5.323 2.95L20.16 3.84m-8.15 11.16a4.5 4.5 0 10-9 0 4.5 4.5 0 009 0z" />
+                    </svg>
+                    <span>设置</span>
+                </button>
+            </div>
         </div>
         
-        <div id="settings-panel" class="hidden max-w-4xl mx-auto mt-4 p-4 bg-gray-100 rounded-lg border">
+        <div id="settings-panel" class="hidden max-w-4xl mx-auto mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-inner text-sm">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">接口地址 (Base URL)</label>
-                    <input type="text" id="api-url" placeholder="https://api.openai.com/v1" class="w-full p-2 border rounded text-sm" value="https://api.openai.com/v1">
-                    <p class="text-xs text-gray-500 mt-1">提示: 若遇 CORS 错误，请使用支持跨域的代理地址。</p>
+                <div class="col-span-1 md:col-span-2">
+                    <label class="block font-semibold text-gray-700 mb-1">快速预设 (可选)</label>
+                    <select onchange="applyPreset(this.value)" class="w-full p-2 border rounded bg-white">
+                        <option value="">-- 选择预设以自动填充 Base URL --</option>
+                        <option value="openai">OpenAI (官方, 需代理)</option>
+                        <option value="openrouter">OpenRouter (推荐, 支持跨域)</option>
+                        <option value="deepseek">DeepSeek (深度求索)</option>
+                        <option value="ollama">Local Ollama (本地)</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">API Key</label>
-                    <input type="password" id="api-key" placeholder="sk-..." class="w-full p-2 border rounded text-sm">
+                    <label class="block font-semibold text-gray-700 mb-1">接口地址 (Base URL)</label>
+                    <input type="text" id="api-url" placeholder="https://api.openai.com/v1" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">模型名称 (Model)</label>
-                    <input type="text" id="model-name" placeholder="gpt-3.5-turbo" class="w-full p-2 border rounded text-sm" value="gpt-3.5-turbo">
+                    <label class="block font-semibold text-gray-700 mb-1">API Key</label>
+                    <input type="password" id="api-key" placeholder="sk-..." class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-gray-700 mb-1">模型名称 (Model)</label>
+                    <input type="text" id="model-name" placeholder="gpt-3.5-turbo" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div class="flex items-end">
-                    <button onclick="saveSettings()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 w-full">保存配置到本地</button>
+                    <button onclick="saveSettings()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded hover:bg-blue-700 w-full transition">保存并关闭</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full">
-        <div class="flex gap-3">
-            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm">🤖</div>
-            <div class="bg-white p-3 rounded-lg border shadow-sm text-sm text-gray-800 max-w-[85%]">
-                你好！请在上方设置中填入你的 API Key。本网站纯静态，Key 仅存储在你的浏览器本地。
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-6 max-w-4xl mx-auto w-full scroll-smooth">
+        <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-lg shrink-0 border border-blue-200">🤖</div>
+            <div class="bg-white p-4 rounded-2xl rounded-tl-none border shadow-sm text-gray-800 max-w-[90%] leading-relaxed">
+                <p>你好！我是你的通用 AI 助手。</p>
+                <p class="text-sm text-gray-500 mt-2">💡 使用指南：</p>
+                <ul class="text-sm text-gray-500 list-disc list-inside">
+                    <li>点击右上角 <strong>"设置"</strong> 填入 API Key 和接口地址。</li>
+                    <li>所有数据仅保存在你的浏览器本地。</li>
+                    <li>支持导出 Markdown 格式的对话记录。</li>
+                </ul>
             </div>
         </div>
     </main>
 
-    <footer class="p-4 bg-white border-t">
+    <footer class="p-4 bg-white border-t z-10">
         <div class="max-w-4xl mx-auto relative">
-            <textarea id="user-input" rows="3" class="w-full p-3 pr-12 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="输入你的问题... (Shift+Enter 换行)"></textarea>
-            <button onclick="sendMessage()" id="send-btn" class="absolute right-3 bottom-3 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition disabled:bg-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            <textarea id="user-input" rows="1" class="w-full p-3 pr-12 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm max-h-48 overflow-y-auto" placeholder="输入你想问的内容... (Shift+Enter 换行)"></textarea>
+            <button onclick="sendMessage()" id="send-btn" class="absolute right-2 bottom-2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
                 </svg>
             </button>
+        </div>
+        <div class="text-center mt-2 text-xs text-gray-400">
+            Power by BYOK (Bring Your Own Key) Architecture
         </div>
     </footer>
 
     <script>
-        // --- 1. 初始化与设置管理 ---
+        // --- 全局变量 ---
         const settingsPanel = document.getElementById('settings-panel');
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        let chatHistory = []; // 用于存储对话历史以便导出
 
-        // 加载本地存储的设置
+        // --- 初始化：加载本地设置 ---
         window.onload = () => {
-            if(localStorage.getItem('apiUrl')) document.getElementById('api-url').value = localStorage.getItem('apiUrl');
-            if(localStorage.getItem('apiKey')) document.getElementById('api-key').value = localStorage.getItem('apiKey');
-            if(localStorage.getItem('modelName')) document.getElementById('model-name').value = localStorage.getItem('modelName');
+            const savedUrl = localStorage.getItem('apiUrl') || 'https://openrouter.ai/api/v1';
+            const savedKey = localStorage.getItem('apiKey') || '';
+            const savedModel = localStorage.getItem('modelName') || 'openai/gpt-3.5-turbo';
+            
+            document.getElementById('api-url').value = savedUrl;
+            document.getElementById('api-key').value = savedKey;
+            document.getElementById('model-name').value = savedModel;
+
+            // 自动调整输入框高度
+            userInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
         };
 
+        // --- 设置面板逻辑 ---
         function toggleSettings() {
             settingsPanel.classList.toggle('hidden');
+        }
+
+        function applyPreset(type) {
+            const urlInput = document.getElementById('api-url');
+            const modelInput = document.getElementById('model-name');
+            
+            switch(type) {
+                case 'openai':
+                    urlInput.value = 'https://api.openai.com/v1';
+                    modelInput.value = 'gpt-3.5-turbo';
+                    break;
+                case 'openrouter':
+                    urlInput.value = 'https://openrouter.ai/api/v1';
+                    modelInput.value = 'openai/gpt-3.5-turbo';
+                    break;
+                case 'deepseek':
+                    urlInput.value = 'https://api.deepseek.com/v1';
+                    modelInput.value = 'deepseek-chat';
+                    break;
+                case 'ollama':
+                    urlInput.value = 'http://localhost:11434/v1';
+                    modelInput.value = 'llama2';
+                    break;
+            }
         }
 
         function saveSettings() {
             localStorage.setItem('apiUrl', document.getElementById('api-url').value);
             localStorage.setItem('apiKey', document.getElementById('api-key').value);
             localStorage.setItem('modelName', document.getElementById('model-name').value);
-            alert('设置已保存！');
             toggleSettings();
+            // 显示一个小提示（可选）
         }
 
-        // --- 2. 消息发送逻辑 ---
+        // --- 核心：发送消息逻辑 ---
         async function sendMessage() {
             const content = userInput.value.trim();
             if (!content) return;
 
             const apiKey = document.getElementById('api-key').value;
-            const apiUrl = document.getElementById('api-url').value.replace(/\/$/, ''); // 去掉末尾斜杠
+            const apiUrl = document.getElementById('api-url').value.replace(/\/$/, '');
             const model = document.getElementById('model-name').value;
 
-            if (!apiKey) { alert('请先设置 API Key'); toggleSettings(); return; }
+            if (!apiKey) {
+                alert('请先在设置中填入 API Key！');
+                toggleSettings();
+                return;
+            }
 
-            // 添加用户消息到 UI
+            // 1. 记录并显示用户消息
+            chatHistory.push({ role: 'user', content: content });
             appendMessage('user', content);
+            
+            // 重置输入框
             userInput.value = '';
-            userInput.style.height = 'auto'; // 重置高度
+            userInput.style.height = 'auto';
             sendBtn.disabled = true;
 
-            // 创建 AI 回复的容器
+            // 2. 创建 AI 回复占位符
             const aiMessageDiv = appendMessage('ai', '');
             const aiContentArea = aiMessageDiv.querySelector('.prose');
             
+            // 在历史记录中占位
+            const historyIndex = chatHistory.push({ role: 'assistant', content: '' }) - 1;
+            let fullReply = "";
+
             try {
-                // 发起请求
+                // 3. 发起 Fetch 请求
                 const response = await fetch(`${apiUrl}/chat/completions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
+                        'Authorization': `Bearer ${apiKey}`,
+                        // 某些服务商(如OpenRouter)需要的额外头
+                        'HTTP-Referer': window.location.href, 
+                        'X-Title': 'Universal AI Client'
                     },
                     body: JSON.stringify({
                         model: model,
-                        messages: [{ role: "user", content: content }],
-                        stream: true // 开启流式传输
+                        messages: [{ role: "user", content: content }], // 目前简单起见只发单条，可改为发送 chatHistory
+                        stream: true
                     })
                 });
 
                 if (!response.ok) {
-                    const err = await response.text();
-                    throw new Error(`API 请求失败: ${response.status} - ${err}`);
+                    const errText = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errText}`);
                 }
 
-                // 处理流式响应
+                // 4. 处理流式响应
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
-                let rawText = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -150,47 +240,87 @@
                             try {
                                 const json = JSON.parse(line.substring(6));
                                 const token = json.choices[0]?.delta?.content || "";
-                                rawText += token;
-                                // 实时渲染 Markdown
-                                aiContentArea.innerHTML = marked.parse(rawText);
+                                fullReply += token;
+                                
+                                // 实时更新 UI 和历史记录
+                                chatHistory[historyIndex].content = fullReply;
+                                aiContentArea.innerHTML = marked.parse(fullReply);
+                                
+                                // 自动滚动到底部
                                 chatContainer.scrollTop = chatContainer.scrollHeight;
                             } catch (e) {
-                                console.error("解析错误", e);
+                                console.warn("JSON Parse Error:", e);
                             }
                         }
                     }
                 }
+                
+                // 移除光标效果（可选）
+                // aiContentArea.classList.remove('cursor');
 
             } catch (error) {
-                aiContentArea.innerHTML += `<br><span class="text-red-500 font-bold">[错误] ${error.message}</span>`;
-                if(error.message.includes('Failed to fetch')) {
-                    aiContentArea.innerHTML += `<br><span class="text-xs text-gray-500">提示: 可能是 CORS 跨域问题。OpenAI 官方接口不支持浏览器直接访问，请尝试使用第三方代理地址或 OpenRouter。</span>`;
-                }
+                console.error(error);
+                aiContentArea.innerHTML += `<div class="text-red-500 mt-2 bg-red-50 p-2 rounded text-xs border border-red-200">
+                    <strong>请求失败:</strong> ${error.message}<br>
+                    提示: 如果遇到 CORS 跨域错误，请尝试使用 OpenRouter 或配置本地代理。
+                </div>`;
+                chatHistory[historyIndex].content += `\n[System Error: ${error.message}]`;
             } finally {
                 sendBtn.disabled = false;
             }
         }
 
-        // --- 3. 辅助功能 ---
+        // --- UI 辅助函数 ---
         function appendMessage(role, text) {
             const div = document.createElement('div');
-            div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''}`;
+            div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''}`;
             
             const avatar = role === 'user' ? '👤' : '🤖';
             const bgClass = role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-800';
+            const radiusClass = role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none';
+            
+            // 如果是 AI，添加 'cursor' 类来实现打字机光标
+            const cursorClass = role === 'ai' ? 'cursor' : '';
             
             div.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm shrink-0">${avatar}</div>
-                <div class="${bgClass} p-3 rounded-lg shadow-sm max-w-[85%] prose prose-sm overflow-hidden">
-                    ${role === 'user' ? text : '<span class="cursor"></span>'} 
+                <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm shrink-0 border">${avatar}</div>
+                <div class="${bgClass} p-4 rounded-2xl ${radiusClass} shadow-sm max-w-[85%] prose ${cursorClass}">
+                    ${role === 'user' ? text : ''}
                 </div>
             `;
+            
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             return div;
         }
 
-        // 支持回车发送
+        // --- 导出功能 ---
+        function exportChat() {
+            if (chatHistory.length === 0) {
+                alert('这里空空如也，先聊两句吧！');
+                return;
+            }
+
+            let mdContent = `# AI 对话记录\n导出时间: ${new Date().toLocaleString()}\n\n---\n\n`;
+
+            chatHistory.forEach(msg => {
+                const roleName = msg.role === 'user' ? '## 👤 我' : '## 🤖 AI';
+                mdContent += `${roleName}\n\n${msg.content}\n\n`;
+            });
+
+            const blob = new Blob([mdContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+            a.download = `chat_export_${timestamp}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 回车发送 (Shift+Enter 换行)
         userInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
