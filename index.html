@@ -78,8 +78,8 @@
         <div class="flex gap-4">
             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl shadow-md text-white shrink-0">🤖</div>
             <div class="bg-white p-5 rounded-2xl rounded-tl-none border border-gray-100 shadow-sm text-gray-800 max-w-[90%]">
-                <h3 class="font-bold text-lg mb-2">欢迎使用全兼容版 AI 终端</h3>
-                <p class="text-sm text-gray-600 mb-2">我已经根据你的需求升级了内核，现在完美支持以下两种模式：</p>
+                <h3 class="font-bold text-lg mb-2">欢迎使用通用AI调用台</h3>
+              
                 <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
                     <li><strong>Ollama 原生模式:</strong> 对应 <code>/api/generate</code> (Prompt 模式)</li>
                     <li><strong>OpenAI 标准模式:</strong> 对应 <code>/v1/chat/completions</code> (Messages 模式)</li>
@@ -87,6 +87,7 @@
                 <div class="mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
                     <strong>⚠️ 注意 CORS 问题：</strong><br>
                     如果你在 GitHub Pages (HTTPS) 上使用，连接本地 Ollama (HTTP) 可能会失败。<br>
+					本地ollma要终端输入命令运行：$env:OLLAMA_ORIGINS="*"; ollama serve<br>
                     建议本地运行: <code>python -m http.server</code>
                 </div>
             </div>
@@ -117,7 +118,7 @@
             // 读取本地存储，如果没有则默认使用 Ollama 原生配置
             document.getElementById('api-url').value = localStorage.getItem('apiUrl') || 'http://localhost:11434/api/generate';
             document.getElementById('api-key').value = localStorage.getItem('apiKey') || '';
-            document.getElementById('model-name').value = localStorage.getItem('modelName') || 'gemma3';
+            document.getElementById('model-name').value = localStorage.getItem('modelName') || 'gpt-oss:20b';
 
             userInput.addEventListener('input', function() {
                 this.style.height = 'auto';
@@ -298,22 +299,34 @@
         // --- 辅助功能 ---
         function appendMessage(role, text) {
             const div = document.createElement('div');
-            div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''}`;
+            div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''} message-bubble`;
             
             const avatar = role === 'user' ? '👤' : '🤖';
-            const bgClass = role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-100 text-gray-800';
+            const bgClass = role === 'user' ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-white border border-gray-100 text-gray-800';
             const radiusClass = role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none';
             const cursorClass = role === 'ai' ? 'cursor' : '';
             
             div.innerHTML = `
-                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg shrink-0 border border-gray-200 shadow-sm">${avatar}</div>
-                <div class="${bgClass} p-4 rounded-2xl ${radiusClass} shadow-sm max-w-[85%] prose ${cursorClass}">
+                <div class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-lg shrink-0 border border-gray-200 shadow-md">${avatar}</div>
+                <div class="${bgClass} p-5 rounded-2xl ${radiusClass} shadow-md max-w-[90%] prose ${cursorClass} card-shadow">
                     ${role === 'user' ? text : ''}
                 </div>
             `;
             chatContainer.appendChild(div);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             return div;
+        }
+        
+        // 清空对话功能
+        function clearChat() {
+            if (confirm('确定要清空所有对话记录吗？')) {
+                chatHistory = [];
+                const chatContainer = document.getElementById('chat-container');
+                // 保留欢迎消息
+                const welcomeMessage = chatContainer.firstChild;
+                chatContainer.innerHTML = '';
+                chatContainer.appendChild(welcomeMessage);
+            }
         }
 
         function exportChat() {
@@ -338,6 +351,15 @@
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            }
+        });
+        
+        // 点击设置面板外部关闭设置
+        document.addEventListener('click', (e) => {
+            const settingsPanel = document.getElementById('settings-panel');
+            const toggleBtn = document.querySelector('button[onclick="toggleSettings()"]');
+            if (!settingsPanel.contains(e.target) && !toggleBtn.contains(e.target)) {
+                settingsPanel.classList.add('hidden');
             }
         });
     </script>
